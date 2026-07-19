@@ -1,0 +1,49 @@
+/* Transcribed by hand from Design.md ("Sage") frontmatter tokens.
+   No build pipeline — Design.md's YAML is the reference, this file is the
+   resolved, static output (see plan.md Section 6). */
+:root {
+  --color-background: #F7F5EF;
+  --color-on-background: #242820;
+  --color-surface: #FFFFFF;
+  --color-surface-container-lowest: #FFFFFF;
+  --color-surface-container-low: #F4F2E8;
+  --color-surface-container: #EDEAE0;
+  --color-surface-container-high: #E5E1D3;
+  --color-on-surface: #242820;
+  --color-on-surface-variant: #5B6353;
+  --color-outline: #98A28A;
+  --color-outline-variant: #D8DBC8;
+
+  --color-primary: #6E7F5B;
+  --color-on-primary: #FFFFFF;
+  --color-primary-container: #DCE4CB;
+  --color-on-primary-container: #212D14;
+
+  --color-secondary: #B8874A;
+  --color-on-secondary: #FFFFFF;
+  --color-secondary-container: #F4E3C6;
+  --color-on-secondary-container: #4A340E;
+
+  --color-tertiary: #B5654A;
+  --color-tertiary-container: #F5DBCF;
+
+  --color-error: #B3413A;
+  --color-on-error: #FFFFFF;
+  --color-error-container: #F6DAD6;
+  --color-on-error-container: #5C1A14;
+
+  --font-headline: 'Fraunces', Georgia, serif;
+  --font-body: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --rounded-sm: 0.25rem;
+  --rounded-md: 0.75rem;
+  --rounded-lg: 1rem;
+  --rounded-xl: 1.5rem;
+  --rounded-full: 9999px;
+
+  --spacing-unit: 8px;
+  --container-max: 1120px;
+  --gutter: 24px;
+  --margin-mobile: 20px;
+  --margin-desktop: 80px;
+}

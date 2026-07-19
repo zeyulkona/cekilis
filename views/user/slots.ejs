@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <%- include('../partials/head', { title: event.name }) %>
+</head>
+<body>
+  <div class="page">
+    <p><span class="badge-winner">Hoş geldin, <%= maskedName %></span></p>
+    <h1><%= event.name %></h1>
+    <% if (event.description) { %><p><%= event.description %></p><% } %>
+
+    <% if (message === 'dolu') { %>
+      <p class="error-text">Seçtiğiniz slot az önce doldu. Lütfen başka bir slot seçin.</p>
+    <% } else if (message === 'suresi_doldu') { %>
+      <p class="error-text">5 dakikalık süreniz doldu. Lütfen tekrar seçin.</p>
+    <% } %>
+
+    <% if (slots.length === 0) { %>
+      <p>Bu etkinlik için henüz gün/saat seçeneği tanımlanmadı.</p>
+    <% } else { %>
+      <div class="slot-grid">
+        <% slots.forEach(function(slot) { %>
+          <% if (slot.full) { %>
+            <div class="card-slot card-slot-full">
+              <div class="day"><%= slot.day_label %></div>
+              <div class="time"><%= slot.time_label %></div>
+              <span class="badge-full">Dolu</span>
+            </div>
+          <% } else { %>
+            <form method="POST" action="/slot/<%= slot.id %>/kilitle">
+              <button type="submit" class="card-slot" style="width: 100%;">
+                <div class="day"><%= slot.day_label %></div>
+                <div class="time"><%= slot.time_label %></div>
+              </button>
+            </form>
+          <% } %>
+        <% }); %>
+      </div>
+    <% } %>
+  </div>
+</body>
+</html>

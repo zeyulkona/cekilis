@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <%- include('../partials/head', { title: 'Giriş' }) %>
+</head>
+<body>
+  <div class="page focus-screen">
+    <h1>Biletinizi Alın</h1>
+    <p>Size iletilen giriş numaranızı yazın ve Enter'a basın.</p>
+    <form method="POST" action="/giris">
+      <input
+        class="input-entry-code<%= error ? ' has-error' : '' %>"
+        type="text"
+        name="entry_number"
+        inputmode="numeric"
+        autocomplete="off"
+        autofocus
+        placeholder="••••••"
+      >
+      <% if (error) { %>
+        <p class="error-text"><%= error %></p>
+      <% } %>
+    </form>
+  </div>
+</body>
+</html>

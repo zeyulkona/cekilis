@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <%- include('../partials/head', { title: 'Yeni Etkinlik', noindex: true }) %>
+</head>
+<body>
+  <div class="page admin">
+    <h1>Yeni Etkinlik</h1>
+    <% if (error) { %><p class="error-text"><%= error %></p><% } %>
+    <form method="POST" action="<%= basePath %>/etkinlikler">
+      <label>Etkinlik Adı</label>
+      <input type="text" name="name" required>
+      <label>Açıklama (opsiyonel)</label>
+      <textarea name="description" rows="3"></textarea>
+      <button type="submit" class="button-primary">Oluştur</button>
+    </form>
+  </div>
+</body>
+</html>

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <%- include('../partials/head', { title: 'Biletiniz Hazır' }) %>
+</head>
+<body>
+  <div class="page focus-screen">
+    <div class="confirmation-panel">
+      <span class="badge-winner">Kazandınız — <%= maskedName %></span>
+      <h1>Biletiniz Hazır!</h1>
+      <p><%= event.name %></p>
+      <a class="button-primary" href="/etkinlik/<%= event.id %>/bilet.pdf">Bileti İndir</a>
+    </div>
+  </div>
+</body>
+</html>

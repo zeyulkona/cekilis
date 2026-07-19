@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <%- include('../partials/head', { title: event.name, noindex: true }) %>
+</head>
+<body>
+  <div class="page admin">
+    <p><a href="<%= basePath %>/">&larr; Etkinlikler</a></p>
+    <h1><%= event.name %></h1>
+    <p><%= winnerCount %> kazanan kayıtlı.</p>
+
+    <h2>Gün / Saat / Kontenjan</h2>
+    <table>
+      <thead><tr><th>Gün</th><th>Saat</th><th>Kontenjan</th><th>Dolu/Toplam</th><th></th></tr></thead>
+      <tbody>
+        <% slots.forEach(function(slot) { %>
+          <tr>
+            <td><%= slot.day_label %></td>
+            <td><%= slot.time_label %></td>
+            <td>
+              <form method="POST" action="<%= basePath %>/etkinlikler/<%= event.id %>/slotlar/<%= slot.id %>/kontenjan" style="display:flex; gap:8px;">
+                <input type="number" name="quota" value="<%= slot.quota %>" min="1" style="width:80px; margin-bottom:0;">
+                <button type="submit" class="button-secondary">Güncelle</button>
+              </form>
+            </td>
+            <td><%= slot.occupied %> / <%= slot.quota %> <%= slot.full ? '(Dolu)' : '' %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+
+    <h3>Yeni Gün/Saat Ekle</h3>
+    <form method="POST" action="<%= basePath %>/etkinlikler/<%= event.id %>/slotlar">
+      <label>Gün (ör. 2026-09-12)</label>
+      <input type="text" name="day_label" required>
+      <label>Saat (ör. 19:00)</label>
+      <input type="text" name="time_label" required>
+      <label>Kontenjan (20-60)</label>
+      <input type="number" name="quota" min="1" value="40" required>
+      <button type="submit" class="button-primary">Ekle</button>
+    </form>
+
+    <h2>Kazanan Listesi (Excel)</h2>
+    <p>Excel dosyasında "Ad Soyad" ve "Giriş Numarası" kolonları olmalı. Tekrar yüklerseniz mevcut liste korunur, yalnızca yeni satırlar eklenir.</p>
+    <form method="POST" action="<%= basePath %>/etkinlikler/<%= event.id %>/excel" enctype="multipart/form-data">
+      <input type="file" name="excel" accept=".xlsx,.xls">
+      <button type="submit" class="button-primary">Yükle</button>
+    </form>
+
+    <% if (importSummary) { %>
+      <% if (importSummary.error) { %>
+        <p class="error-text"><%= importSummary.error %></p>
+      <% } else { %>
+        <p>Toplam <%= importSummary.total %> satır — <span class="ok-count"><%= importSummary.inserted %> eklendi</span>, <%= importSummary.skipped.length %> atlandı.</p>
+        <% if (importSummary.skipped.length > 0) { %>
+          <table>
+            <thead><tr><th>Ad Soyad</th><th>Numara</th><th>Sebep</th></tr></thead>
+            <tbody>
+              <% importSummary.skipped.forEach(function(row) { %>
+                <tr>
+                  <td><%= row.full_name %></td>
+                  <td><%= row.entry_number %></td>
+                  <td class="skip-reason"><%= row.reason %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        <% } %>
+      <% } %>
+    <% } %>
+
+    <h2>PDF Bilet</h2>
+    <p>Durum: <%= event.pdf_uploaded_at ? ('Yüklendi (' + event.pdf_uploaded_at + ')') : 'Henüz yüklenmedi' %></p>
+    <% if (typeof pdfError !== 'undefined' && pdfError) { %>
+      <p class="error-text"><%= pdfError %></p>
+    <% } %>
+    <form method="POST" action="<%= basePath %>/etkinlikler/<%= event.id %>/pdf" enctype="multipart/form-data">
+      <input type="file" name="pdf" accept="application/pdf">
+      <button type="submit" class="button-primary">PDF Yükle</button>
+    </form>
+  </div>
+</body>
+</html>

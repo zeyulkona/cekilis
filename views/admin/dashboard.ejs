@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <%- include('../partials/head', { title: 'Admin — Etkinlikler', noindex: true }) %>
+</head>
+<body>
+  <div class="page admin">
+    <h1>Etkinlikler</h1>
+    <a class="button-primary" href="<%= basePath %>/etkinlikler/yeni">+ Yeni Etkinlik</a>
+    <table>
+      <thead><tr><th>Ad</th><th>PDF</th><th></th></tr></thead>
+      <tbody>
+        <% events.forEach(function(event) { %>
+          <tr>
+            <td><%= event.name %></td>
+            <td><%= event.pdf_uploaded_at ? 'Yüklendi' : 'Yok' %></td>
+            <td><a href="<%= basePath %>/etkinlikler/<%= event.id %>">Yönet</a></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
