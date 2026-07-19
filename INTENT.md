@@ -7,9 +7,11 @@
 
 ## Özet
 
-Bir anket/çekiliş başka bir platformda yapılır. Kazananların isim listesi bu
-siteye statik olarak yüklenir; her kazanana geliştirici tarafından benzersiz
-bir **giriş numarası** atanır. Kazanan, herkese açık bir listeye bakmak yerine
+Bir anket/çekiliş başka bir platformda yapılır. Kazananların **Ad Soyad ve
+giriş numarası** birlikte, proje sahibi tarafından hazırlanmış bir Excel
+dosyasıyla sisteme yüklenir (numaralar proje sahibi tarafından üretilir,
+geliştirici/uygulama numara üretmez). Kazanan, herkese açık bir listeye
+bakmak yerine
 kendi giriş numarasını girer; sistem numarayı isimle eşleştirip bir
 etkinlik/gün/saat seçmesine izin verir ve seçim sonrasında PDF bileti anında
 indirir. Sistemde admin paneli, kullanıcı hesabı veya klasik kimlik
@@ -36,15 +38,18 @@ yapılır.
 Uçtan uca akış:
 
 1. **Anket/çekiliş** başka bir platformda yapılır (bu sistemin kapsamı dışında).
-2. Kazananların **Ad Soyad listesi** Excel dosyası olarak geliştiriciye iletilir;
-   geliştirici her kazanana benzersiz bir **giriş numarası** üretip isimle
-   eşleştirir ve bu veriyi sisteme statik olarak işler (bkz. Bölüm 1).
+2. Proje sahibi, **Ad Soyad + giriş numarası** içeren Excel dosyasını
+   hazırlar (numaraları kendisi üretir) ve geliştiriciye iletir; geliştirici
+   bu eşleşmeyi olduğu gibi sisteme statik veri olarak işler (bkz. Bölüm 1).
+   Uygulama numara üretmez/değiştirmez.
 3. Kazanana giriş numarası ayrıca (bu sistemin dışında, ör. anket
    platformu/e-posta/SMS üzerinden) iletilir — bu iletim kanalı kapsam
    dışıdır.
-4. Kullanıcı siteye girdiğinde bir **giriş paneli** görür ve kendi giriş
-   numarasını yazar; sistem numarayı isimle eşleştirir ve kısa bir
-   onay göstergesi (maskeli isim, ör. "Ay Ka") ile doğrular.
+4. Kullanıcı siteye girdiğinde tek alanlı bir **giriş paneli** görür: giriş
+   numarasını yazar ve **Enter'a basarak** giriş yapar (ayrı bir "gönder"
+   butonuna gerek yoktur, Enter tuşu yeterlidir). Sistem numarayı isimle
+   eşleştirir ve kısa bir onay göstergesi (maskeli isim, ör. "Ay Ka") ile
+   doğrular.
 5. Kullanıcı, ilgili etkinlik için uygun **gün/saat kontenjanlarından**
    birini seçer.
 6. Seçim onaylandığında o etkinliğe ait **PDF bilet doğrudan indirilir** ve
@@ -71,7 +76,7 @@ Uçtan uca akış:
   numarayı mı girdim" onayı içindir, gizlilik amaçlı değildir (artık herkese
   açık bir liste olmadığı için tam isim göstermek de mümkündür; maskeleme
   sade bir onay adımı olarak korunur).
-- Giriş numaraları geliştirici tarafından üretildiği ve kişiye özel olduğu
+- Giriş numaraları proje sahibi tarafından üretildiği ve kişiye özel olduğu
   için **maske çakışması artık bir risk değildir**: eşleşme isimden değil,
   benzersiz numaradan yapılır. İki kişinin ismi/maskesi aynı olsa da her
   birinin giriş numarası farklıdır ve karışıklık oluşmaz.
@@ -102,15 +107,17 @@ Uçtan uca akış:
   seçen herkes aynı PDF dosyasını indirir. Etkinlik başına tek bir PDF
   bulunur (gün/saat'e göre farklılaşmaz).
 
-### Excel veri aktarımı ve giriş numarası üretimi
-- Kazanan listesi **statik/geliştirici eliyle** aktarılır: kullanıcı Excel
-  dosyasını (Ad Soyad) geliştiriciye iletir; geliştirici bu veriyi işlerken
-  her satıra benzersiz bir **giriş numarası** üretip eşler, sisteme statik
-  veri olarak ekler ve deploy eder.
+### Excel veri aktarımı
+- Kazanan listesi **statik/geliştirici eliyle** aktarılır: proje sahibi,
+  **Ad Soyad ve giriş numarasını birlikte içeren** Excel dosyasını
+  hazırlayıp geliştiriciye iletir; geliştirici bu eşleşmeyi olduğu gibi
+  (değiştirmeden/yeniden üretmeden) sisteme statik veri olarak işler ve
+  deploy eder. **Uygulama giriş numarası üretmez** — numaralar Excel'de
+  zaten hazır gelir.
 - Ayrı bir "dosya yükleme" arayüzü/endpoint'i **yoktur** — bu, admin paneli
   olmaması ilkesiyle tutarlıdır.
-- Üretilen giriş numaralarının kazananlara nasıl iletileceği (e-posta, SMS,
-  anket platformu vb.) bu sistemin kapsamı dışındadır.
+- Giriş numaralarının kazananlara nasıl iletileceği (e-posta, SMS, anket
+  platformu vb.) bu sistemin kapsamı dışındadır.
 
 ## 4. Style & Tone — Tasarım Referansı
 
@@ -142,6 +149,12 @@ Uçtan uca akış:
 
 ## Revizyon geçmişi
 
+- **v3 — Numara üretimi ve giriş etkileşimi:** Proje sahibi, giriş
+  numaralarını kendisi üretip Ad Soyad ile eşleştirerek Excel'i doğrudan
+  kendisi yükleyeceğini belirtti (v2'deki "geliştirici numara üretir"
+  varsayımı **geçersiz kılındı** — bkz. Bölüm 2 ve "Excel veri aktarımı").
+  Giriş paneli tek alanlı olacak ve **Enter'a basarak** gönderilecek şekilde
+  netleştirildi (bkz. Bölüm 2, adım 4).
 - **v2 — Giriş numarası modeli:** Proje sahibi, herkese açık maskeli liste
   üzerinden "kendini bulup seçme" akışını, her kazanana atanan **benzersiz
   bir giriş numarası** ile erişim akışına değiştirdi. Bu değişiklik önceki

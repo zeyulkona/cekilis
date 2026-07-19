@@ -27,12 +27,13 @@ consult it first.
   runtime CRUD/upload UI for this data, even if asked to add "an admin
   screen" casually. This is an explicit product decision, not an oversight.
 - **No classic auth, but there is an entry-number gate.** No login, email,
-  or password. Every winner gets a unique **entry number**, generated and
-  matched to their name by the developer at data-processing time (from the
-  Excel list) — never by the user. The app's front door is a panel where the
-  user types this number; it is looked up server-side and matched to a name.
-  It is a one-time matching key, not an account — don't build session/auth
-  infrastructure around it.
+  or password. The winner Excel already contains both **name and entry
+  number** — the developer (project owner) assigns and uploads this pair
+  directly; the app never generates numbers itself. The app's front door is
+  a single-field panel: the user types their number and presses **Enter**
+  to submit — no separate button required, just Enter-to-submit on that one
+  field. It is a one-time matching key, not an account — don't build
+  session/auth infrastructure around it.
 - **There is no public/browsable winner list.** Access is 1:1 via entry
   number only; a user must never be able to see other winners' names
   (masked or not) by browsing. After a correct entry number, show the
@@ -70,7 +71,31 @@ consult it first.
 
 This is done by editing static data/files in the codebase and deploying,
 per the "no admin panel" rule above — not by building an upload endpoint or
-UI, unless the user explicitly changes that decision. When processing a new
-Excel winner list, generate the unique entry numbers yourself and commit the
-number↔name mapping as static data; how the numbers reach winners
-afterwards (email, SMS, survey platform) is out of scope for this codebase.
+UI, unless the user explicitly changes that decision. Winner Excel files
+arrive with name and entry number already paired by the project owner —
+just import that pairing as static data verbatim; do not generate, reassign,
+or reorder entry numbers yourself.
+
+## Working style (Karpathy guidelines)
+
+Adapted from https://github.com/multica-ai/andrej-karpathy-skills — apply
+when writing, reviewing, or refactoring code in this repo. Bias toward
+caution over speed; use judgment on trivial tasks.
+
+1. **Think before coding.** Don't assume, don't hide confusion. State
+   assumptions explicitly. If multiple interpretations exist, present them
+   instead of silently picking one. If something is unclear, stop and ask.
+2. **Simplicity first.** Minimum code that solves the problem — no features
+   beyond what was asked, no speculative abstractions or config knobs, no
+   error handling for scenarios that can't happen here (e.g. this system has
+   no auth, so don't add auth-shaped error paths "just in case"). If it
+   could be half the size, rewrite it.
+3. **Surgical changes.** Touch only what the task requires. Don't refactor
+   or reformat adjacent code. Match existing style even if you'd choose
+   differently. Remove imports/variables your own change orphaned; leave
+   pre-existing dead code alone (mention it, don't delete it).
+4. **Goal-driven execution.** Turn tasks into verifiable success criteria
+   before starting (e.g. "add the entry-number lock" → "write a test that
+   two concurrent submits for the same number only let one through, then
+   make it pass"). State a brief step → verification plan for multi-step
+   work.
