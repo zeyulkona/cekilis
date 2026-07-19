@@ -106,6 +106,14 @@ Uçtan uca akış:
   için **maske çakışması artık bir risk değildir**: eşleşme isimden değil,
   benzersiz numaradan yapılır. İki kişinin ismi/maskesi aynı olsa da her
   birinin giriş numarası farklıdır ve karışıklık oluşmaz.
+- **Netleştirme:** Kullanıcı tarafındaki giriş paneli tek ve genel bir
+  alandır (bkz. Bölüm 2, adım 7) — kullanıcı önce bir etkinlik seçmez, önce
+  numarasını yazar. Bu yüzden bir giriş numarası **sistem genelinde
+  benzersiz** olmalıdır (etkinlik + numara kombinasyonu değil, tek başına
+  numara); sistem, numaradan doğrudan tek bir kazanan ve dolayısıyla tek bir
+  etkinliğe ulaşır. Aynı kişi farklı etkinliklerde ayrı ayrı kazanan olabilir
+  (bkz. yukarıda), ama bu durumda her etkinlik için farklı ve birbirinden
+  bağımsız (globalde de benzersiz) bir numara alır.
 
 ### Karar süresi (5 dakika kuralı)
 - Kullanıcı bir gün/saat seçimini değerlendirmeye (kilitlemeye) başladığında
@@ -113,6 +121,12 @@ Uçtan uca akış:
 - Bu süre boyunca üzerinde düşünülen slot **kilitli** kabul edilir; başka
   hiçbir kullanıcı bu süre zarfında o slotu görüp seçemez / listede
   kullanılabilir olarak göremez.
+- **Netleştirme:** Kilit, o gün/saat kombinasyonunun **tüm kontenjanını değil,
+  yalnızca bir birimini** tüketir (bkz. Bölüm 3 "Kontenjan"). Yani aynı anda
+  birden fazla farklı kazanan aynı kombinasyon üzerinde kendi 5 dakikalık
+  kararını verebilir; kombinasyon yalnızca `kilitli + onaylanmış` toplam
+  sayısı kontenjanına ulaştığında herkese "Dolu" görünür. Aksi yorum (kilidin
+  tüm kombinasyonu herkese kapatması) kontenjan kavramıyla çelişir.
 - Süre dolar ve seçim tamamlanmazsa (bilet indirilmezse), kilit otomatik
   kalkar; kişi "henüz bilet almamış" durumuna geri döner ve tekrar
   bir slot seçebilir; slot da tekrar başkalarına açılır.
@@ -192,6 +206,15 @@ Uçtan uca akış:
 
 ## Revizyon geçmişi
 
+- **v5 — plan.md hazırlığı sırasında netleştirilen iki teknik nokta:**
+  Teknik implementasyon planı yazılırken metinde örtük kalan iki nokta
+  açıkça netleştirildi (yeni bir ürün kararı değil, mevcut kuralların
+  mantıksal sonucu):
+  - 5 dakikalık kilit, kombinasyonun **tüm kontenjanını değil bir birimini**
+    tüketir (bkz. Bölüm 3, "Karar süresi").
+  - Giriş numarası **sistem genelinde benzersizdir** (etkinlik bazlı değil)
+    çünkü kullanıcı paneli tek/genel bir giriş alanıdır (bkz. Bölüm 3,
+    "Giriş numarası ve isim eşleştirme").
 - **v4 — Admin paneli eklendi:** Proje sahibi, v1'deki "admin paneli yoktur,
   her şey kod/dosya seviyesinde statik yönetilir" kararını **geçersiz
   kıldı**. Artık tam bir admin paneli vardır (etkinlik/kontenjan/gün-saat
