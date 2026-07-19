@@ -8,11 +8,15 @@
 ## Özet
 
 Bir anket/çekiliş başka bir platformda yapılır. Kazananların isim listesi bu
-siteye statik olarak yüklenir. Site, kazananların isimlerini **maskeli**
-gösterir; kazanan kendini listede bulur, bir etkinlik/gün/saat seçer ve
-seçim sonrasında PDF bileti anında indirir. Sistemde admin paneli, kullanıcı
-hesabı veya kimlik doğrulama yoktur — tüm veri yönetimi (etkinlik, kontenjan,
-kazanan listesi, PDF) geliştirici tarafından kod/dosya seviyesinde yapılır.
+siteye statik olarak yüklenir; her kazanana geliştirici tarafından benzersiz
+bir **giriş numarası** atanır. Kazanan, herkese açık bir listeye bakmak yerine
+kendi giriş numarasını girer; sistem numarayı isimle eşleştirip bir
+etkinlik/gün/saat seçmesine izin verir ve seçim sonrasında PDF bileti anında
+indirir. Sistemde admin paneli, kullanıcı hesabı veya klasik kimlik
+doğrulama (e-posta/şifre) yoktur — giriş numarası tek kullanımlık bir eşleşme
+anahtarıdır, hesap değildir. Tüm veri yönetimi (etkinlik, kontenjan,
+numara↔isim eşleşmesi, PDF) geliştirici tarafından kod/dosya seviyesinde
+yapılır.
 
 ---
 
@@ -33,13 +37,18 @@ Uçtan uca akış:
 
 1. **Anket/çekiliş** başka bir platformda yapılır (bu sistemin kapsamı dışında).
 2. Kazananların **Ad Soyad listesi** Excel dosyası olarak geliştiriciye iletilir;
-   geliştirici bu veriyi sisteme statik olarak işler (bkz. Bölüm 1).
-3. Site, her etkinlik için **kendi kazanan listesini ayrı ayrı** gösterir
-   (etkinlik bazlı listeler — bkz. Bölüm 3, "Liste yapısı").
-4. Kullanıcı bir etkinliğin maskeli kazanan listesinde **kendi ismini bulur**
-   ve seçer.
-5. Kullanıcı, o etkinlik için uygun **gün/saat kontenjanlarından** birini seçer.
-6. Seçim onaylandığında o etkinliğe ait **PDF bilet doğrudan indirilir**.
+   geliştirici her kazanana benzersiz bir **giriş numarası** üretip isimle
+   eşleştirir ve bu veriyi sisteme statik olarak işler (bkz. Bölüm 1).
+3. Kazanana giriş numarası ayrıca (bu sistemin dışında, ör. anket
+   platformu/e-posta/SMS üzerinden) iletilir — bu iletim kanalı kapsam
+   dışıdır.
+4. Kullanıcı siteye girdiğinde bir **giriş paneli** görür ve kendi giriş
+   numarasını yazar; sistem numarayı isimle eşleştirir ve kısa bir
+   onay göstergesi (maskeli isim, ör. "Ay Ka") ile doğrular.
+5. Kullanıcı, ilgili etkinlik için uygun **gün/saat kontenjanlarından**
+   birini seçer.
+6. Seçim onaylandığında o etkinliğe ait **PDF bilet doğrudan indirilir** ve
+   giriş numarası kullanılmış olarak işaretlenir.
 
 ## 3. Context & Constraint — Veri Modeli & Kurallar
 
@@ -50,17 +59,22 @@ Uçtan uca akış:
 - Kontenjan dolan bir kombinasyon **arayüzde net biçimde "Dolu"** olarak
   işaretlenir ve seçilemez hale gelir.
 
-### Liste yapısı ve maskeleme
+### Giriş numarası ve isim eşleştirme
 - Kazanan listesi **etkinlik bazlı** tutulur: bir kişi farklı etkinliklerde
   ayrı ayrı kazanan olarak listelenebilir; her etkinlikte kendi bağımsız
-  1-seçim hakkını kullanır.
-- İsimler arayüzde maskeli gösterilir: adın ve soyadın **ilk ikişer harfi**
-  (ör. "Ay Ka").
-- **Maske çakışması:** Aynı etkinlik listesinde birden fazla kişinin maskesi
-  aynı çıkarsa (ör. iki "Ahmet Yılmaz" → ikisi de "Ah Yı"), arayüzde
-  otomatik bir ayırt edici gösterilir: **"Ah Yı (1)", "Ah Yı (2)"** gibi
-  sıra numarası eklenir. Bu, yanlış kişinin bileti almasını önlemek için
-  zorunludur ve veri yükleme aşamasında otomatik tespit edilir.
+  giriş numarasına ve 1-seçim hakkına sahiptir.
+- Herkese açık, gezilebilir bir kazanan listesi **yoktur**: kullanıcı başka
+  kazananların isimlerini (maskeli dahi olsa) göremez. Erişim tamamen
+  kişinin kendi giriş numarasını girmesiyle olur.
+- Giriş numarası doğru girildiğinde, kullanıcıya kendi ismi **maskeli**
+  gösterilir (adın ve soyadın ilk ikişer harfi, ör. "Ay Ka") — bu, "doğru
+  numarayı mı girdim" onayı içindir, gizlilik amaçlı değildir (artık herkese
+  açık bir liste olmadığı için tam isim göstermek de mümkündür; maskeleme
+  sade bir onay adımı olarak korunur).
+- Giriş numaraları geliştirici tarafından üretildiği ve kişiye özel olduğu
+  için **maske çakışması artık bir risk değildir**: eşleşme isimden değil,
+  benzersiz numaradan yapılır. İki kişinin ismi/maskesi aynı olsa da her
+  birinin giriş numarası farklıdır ve karışıklık oluşmaz.
 
 ### Karar süresi (5 dakika kuralı)
 - Kullanıcı bir gün/saat seçimini değerlendirmeye (kilitlemeye) başladığında
@@ -73,30 +87,30 @@ Uçtan uca akış:
   bir slot seçebilir; slot da tekrar başkalarına açılır.
 
 ### Tekillik kuralı ve teknik uygulaması
-- **Zorunlu kural:** Bir isim (liste satırı) yalnızca **bir kez** bilet
-  seçimi için kullanılabilir; başarılı bir seçimden sonra o isim listede
-  **"kullanıldı" / pasif** olarak işaretlenir ve bir daha seçilemez. Bu,
-  sunucu tarafında otoriter (authoritative) kural olarak uygulanır.
-- **Ek önlem:** Sistemde kullanıcı hesabı/kimlik doğrulaması olmadığından,
-  bu kural yalnızca isim satırı bazında %100 garanti edilebilir. Buna ek
-  olarak, bir cihaz/tarayıcının (localStorage/cookie ile) art arda birden
-  fazla farklı isim seçmesini zorlaştırmak için **tarayıcı bazlı bir
-  ikincil kısıt** uygulanır (ör. bir tarayıcıda başarılı seçim sonrası
-  yeni bir seçim denemesi engellenir/uyarılır). Bu ikincil önlem kesin
-  değildir (farklı cihaz/gizli sekme ile aşılabilir), amacı yalnızca kaza
-  sonucu / niyetsiz ikinci seçimleri azaltmaktır; asıl garanti isim satırı
-  kilididir.
+- **Zorunlu kural:** Bir giriş numarası yalnızca **bir kez** bilet seçimi
+  için kullanılabilir; başarılı bir seçimden sonra o numara
+  **"kullanıldı"** olarak işaretlenir ve bir daha bilet seçimi için
+  kullanılamaz (numara ile tekrar girilip mevcut/geçmiş seçim
+  görüntülenebilir, ama yeni bir seçim yapılamaz).
+- Bu, sunucu tarafında **otoriter ve tam garantili** bir kuraldır: giriş
+  numarası zaten kişiye özel ve tek olduğundan, önceki tasarımdaki
+  cihaz/tarayıcı bazlı ikincil kısıta (bkz. eski revizyon) artık gerek
+  yoktur — numaranın kendisi tekilliği doğrudan sağlar.
 
 ### PDF biletler
 - PDF biletler **etkinliğe özeldir, kişiye özel değildir**: bir etkinliği
   seçen herkes aynı PDF dosyasını indirir. Etkinlik başına tek bir PDF
   bulunur (gün/saat'e göre farklılaşmaz).
 
-### Excel veri aktarımı
+### Excel veri aktarımı ve giriş numarası üretimi
 - Kazanan listesi **statik/geliştirici eliyle** aktarılır: kullanıcı Excel
-  dosyasını geliştiriciye iletir, geliştirici veriyi işleyip deploy eder.
-  Ayrı bir "dosya yükleme" arayüzü/endpoint'i **yoktur** — bu, admin
-  paneli olmaması ilkesiyle tutarlıdır.
+  dosyasını (Ad Soyad) geliştiriciye iletir; geliştirici bu veriyi işlerken
+  her satıra benzersiz bir **giriş numarası** üretip eşler, sisteme statik
+  veri olarak ekler ve deploy eder.
+- Ayrı bir "dosya yükleme" arayüzü/endpoint'i **yoktur** — bu, admin paneli
+  olmaması ilkesiyle tutarlıdır.
+- Üretilen giriş numaralarının kazananlara nasıl iletileceği (e-posta, SMS,
+  anket platformu vb.) bu sistemin kapsamı dışındadır.
 
 ## 4. Style & Tone — Tasarım Referansı
 
@@ -111,9 +125,13 @@ Uçtan uca akış:
 ## 5. Guardrail — Güvenlik Kuralları
 
 - **Ekstra kimlik doğrulama yoktur**: e-posta, şifre veya doğrulama kodu
-  girişi istenmez.
-- **Tek zorunlu kural**: bir isim/kişi birden fazla seçim yapamaz
+  girişi istenmez. Giriş numarası bir hesap değil, tek kullanımlık bir
+  eşleştirme anahtarıdır.
+- **Tek zorunlu kural**: bir giriş numarası birden fazla seçim yapamaz
   (bkz. Bölüm 3, "Tekillik kuralı").
+- Giriş paneli, yanlış/var olmayan bir numara girildiğinde genel bir hata
+  mesajı gösterir (hangi numaraların geçerli olduğuna dair bilgi sızdırmaz,
+  numara enumerasyonuna karşı brute-force'u kolaylaştıracak ayrıntı vermez).
 - **Race condition koruması**: bir slot seçilip kilitlendiğinde, o slot
   eşzamanlı olarak başka bir kullanıcı tarafından görülüp seçilemez
   (sunucu tarafında atomik kilitleme gereklidir).
@@ -122,15 +140,30 @@ Uçtan uca akış:
 
 ---
 
+## Revizyon geçmişi
+
+- **v2 — Giriş numarası modeli:** Proje sahibi, herkese açık maskeli liste
+  üzerinden "kendini bulup seçme" akışını, her kazanana atanan **benzersiz
+  bir giriş numarası** ile erişim akışına değiştirdi. Bu değişiklik önceki
+  sürümdeki iki maddeyi **geçersiz kılar**:
+  - Eski "maske çakışması → sıra numarası ekle" çözümü artık gerekli
+    değildir (eşleştirme isme değil numaraya dayanıyor).
+  - Eski "isim satırı kilidi + tarayıcı bazlı ikincil kısıt" tekillik
+    mekanizması, tek başına yeterli olan **giriş numarası tekilliği** ile
+    değiştirildi (bkz. Bölüm 3, "Tekillik kuralı").
+  - Herkese açık kazanan listesi kaldırıldı; erişim bir **giriş paneli**
+    (numara girişi) üzerinden yapılır (bkz. Bölüm 2 ve 3).
+
 ## Bu belgede geliştirici tarafından alınan kararlar
 
 Aşağıdaki noktalar proje sahibi tarafından "kendin karar ver" denilerek
-geliştiriciye bırakılmıştır; yukarıdaki ilgili bölümlere işlenmiştir:
+geliştiriciye bırakılmıştır:
 
-1. **Tekillik kontrolü mekanizması**: İsim satırı kilidi (otoriter) +
-   tarayıcı bazlı ikincil kısıt (kesin değil, ek önlem) — Bölüm 3.
-2. **Maske çakışması**: Çakışan maskelere otomatik sıra numarası eklenir
-   (ör. "Ah Yı (1)", "Ah Yı (2)") — Bölüm 3.
+1. Giriş numarası doğrulandıktan sonra kullanıcıya tam isim yerine
+   **maskeli isim** gösterilmesi (kısa bir "doğru numara" onayı olarak) —
+   Bölüm 3, "Giriş numarası ve isim eşleştirme".
+2. Geçersiz numara girişinde numara enumerasyonunu kolaylaştırmayacak genel
+   bir hata mesajı gösterilmesi — Bölüm 5.
 
 ## Kapsam dışı (Out of scope)
 
