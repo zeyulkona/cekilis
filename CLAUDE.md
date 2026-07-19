@@ -64,8 +64,14 @@ consult it first.
 - **PDFs are per-event, not per-person.** One static PDF per event; everyone
   who selects that event downloads the same file. Don't design per-user
   ticket generation.
-- **Design reference is İKSV** (sade, zarif, kültür/sanat odaklı, whitespace-
-  heavy, typography-forward) — see `INTENT.md` Section 4 before styling UI.
+- **Design system is `Design.md` ("Sage").** İKSV-inspired (sade, zarif,
+  kültür/sanat odaklı, whitespace-heavy, typography-forward — see
+  `INTENT.md` Section 4), extended with light gamification limited to
+  feedback/celebration moments (entry-code confirmation, 5-minute lock
+  countdown, ticket-ready state). Read `Design.md` for actual color/type/
+  component tokens before styling any UI — don't invent new accent colors
+  or gamification mechanics (points, levels, leaderboards) beyond what it
+  specifies; its Do's and Don'ts section is explicit about this boundary.
 
 ## When adding data (events, quotas, winner lists, PDFs)
 
