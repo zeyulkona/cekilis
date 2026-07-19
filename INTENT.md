@@ -7,52 +7,77 @@
 
 ## Özet
 
-Bir anket/çekiliş başka bir platformda yapılır. Kazananların **Ad Soyad ve
-giriş numarası** birlikte, proje sahibi tarafından hazırlanmış bir Excel
-dosyasıyla sisteme yüklenir (numaralar proje sahibi tarafından üretilir,
-geliştirici/uygulama numara üretmez). Kazanan, herkese açık bir listeye
-bakmak yerine
-kendi giriş numarasını girer; sistem numarayı isimle eşleştirip bir
-etkinlik/gün/saat seçmesine izin verir ve seçim sonrasında PDF bileti anında
-indirir. Sistemde admin paneli, kullanıcı hesabı veya klasik kimlik
-doğrulama (e-posta/şifre) yoktur — giriş numarası tek kullanımlık bir eşleşme
-anahtarıdır, hesap değildir. Tüm veri yönetimi (etkinlik, kontenjan,
-numara↔isim eşleşmesi, PDF) geliştirici tarafından kod/dosya seviyesinde
-yapılır.
+Sistemde iki panel vardır: bir **admin paneli** ve bir **kullanıcı paneli**.
+Bir anket/çekiliş başka bir platformda yapılır. Proje sahibi, admin panelinden
+etkinlik/gün/saat/kontenjan tanımlarını yönetir, kazananların **Ad Soyad ve
+giriş numarası** eşleşmesini içeren Excel dosyasını yükler ve etkinliğin PDF
+biletini yükler (numaraları proje sahibi kendisi üretir; sistem numara
+üretmez). Kazanan, herkese açık bir listeye bakmak yerine kullanıcı
+panelinde kendi giriş numarasını girer; sistem numarayı isimle eşleştirip
+bir etkinlik/gün/saat seçmesine izin verir ve seçim sonrasında PDF bileti
+anında indirir. Kullanıcı tarafında klasik kimlik doğrulama (e-posta/şifre)
+yoktur — giriş numarası tek kullanımlık bir eşleşme anahtarıdır, hesap
+değildir. Admin paneli ise şifre/hesap yerine gizli, tahmin edilemez bir URL
+ile korunur (bkz. Bölüm 1 ve 5).
 
 ---
 
 ## 1. Role — Yönetim Modeli
 
-- Sistemde **admin paneli yoktur**. Hiçbir ekran üzerinden etkinlik, kontenjan
-  veya liste ekleme/düzenleme yapılmaz.
-- Etkinlik tanımları, kontenjanlar, kazanan listesi ve PDF biletler
-  **geliştirici tarafından statik veri/dosya olarak** projeye eklenir ve
-  deploy edilir (örn. bir yapılandırma dosyası + PDF dosyaları).
-- Yeni bir etkinlik eklemek, kontenjan değiştirmek veya yeni bir kazanan
-  listesi yüklemek istendiğinde bu, geliştiriciye iletilen bir talep ile
-  (kod değişikliği + deploy) gerçekleşir; runtime'da veri girişi yapılmaz.
+Sistemde iki ayrı panel vardır:
+
+### Admin paneli
+- **Tam bir yönetim panelidir**: kod değişikliği/deploy gerekmeden runtime'da
+  veri yönetimi yapılır. Admin panelden yapılabilenler:
+  - Etkinlik oluşturma/düzenleme (isim, açıklama vb.).
+  - Her etkinlik için gün/saat kombinasyonları ve her kombinasyonun
+    kontenjan sayısını (20–60 arası, bkz. Bölüm 3) tanımlama/düzenleme.
+  - Kazanan listesini **Excel** dosyası olarak yükleme (Ad Soyad + giriş
+    numarası birlikte — bkz. Bölüm 3, "Excel veri aktarımı").
+  - Etkinliğin **PDF** biletini yükleme (etkinlik başına tek dosya, tekrar
+    yüklenirse üzerine yazılır).
+- **Erişim modeli:** Admin panelinin kullanıcı adı/şifre girişi **yoktur**.
+  Erişim tamamen gizli, tahmin edilemesi çok zor bir URL'ye (ör. rastgele
+  uzun bir path/token) dayanır — "security through obscurity". Bu, proje
+  sahibinin bilinçli tercihidir: tek kişi tarafından yönetildiği için ekstra
+  bir login akışı gereksiz görülmüştür. Bkz. Bölüm 5 için bu modelin
+  getirdiği ek kurallar (URL'nin sızmaması için alınması gereken önlemler).
+- Proje sahibi (admin) tek kişidir; çoklu admin hesabı/rol ayrımı yoktur.
+
+### Kullanıcı paneli
+- Kazananların giriş numarasıyla erişip slot seçip bilet indirdiği taraf.
+- Kimlik doğrulama/hesap **yoktur** (bkz. Bölüm 5); tek kullanılan mekanizma
+  giriş numarasıdır.
 
 ## 2. Task & Format — Ürün Akışı
 
 Uçtan uca akış:
 
+**Admin tarafı:**
+
 1. **Anket/çekiliş** başka bir platformda yapılır (bu sistemin kapsamı dışında).
-2. Proje sahibi, **Ad Soyad + giriş numarası** içeren Excel dosyasını
-   hazırlar (numaraları kendisi üretir) ve geliştiriciye iletir; geliştirici
-   bu eşleşmeyi olduğu gibi sisteme statik veri olarak işler (bkz. Bölüm 1).
-   Uygulama numara üretmez/değiştirmez.
-3. Kazanana giriş numarası ayrıca (bu sistemin dışında, ör. anket
-   platformu/e-posta/SMS üzerinden) iletilir — bu iletim kanalı kapsam
+2. Admin, gizli admin paneli URL'sinden panele girer.
+3. Admin, panelden etkinliği (ve varsa gün/saat kombinasyonları ile
+   kontenjan sayılarını) oluşturur/düzenler.
+4. Admin, **Ad Soyad + giriş numarası** içeren Excel dosyasını (numaraları
+   kendisi üretmiştir) o etkinlik için panelden yükler. Aynı etkinliğe daha
+   sonra tekrar Excel yüklenirse, yeni satırlar mevcut listeye **eklenir**
+   (append) — bkz. Bölüm 3, "Excel veri aktarımı".
+5. Admin, o etkinliğin **PDF** biletini panelden yükler.
+6. Giriş numaraları kazananlara admin tarafından, bu sistemin dışında
+   (ör. anket platformu/e-posta/SMS) iletilir — bu iletim kanalı kapsam
    dışıdır.
-4. Kullanıcı siteye girdiğinde tek alanlı bir **giriş paneli** görür: giriş
+
+**Kullanıcı tarafı:**
+
+7. Kullanıcı siteye girdiğinde tek alanlı bir **giriş paneli** görür: giriş
    numarasını yazar ve **Enter'a basarak** giriş yapar (ayrı bir "gönder"
    butonuna gerek yoktur, Enter tuşu yeterlidir). Sistem numarayı isimle
    eşleştirir ve kısa bir onay göstergesi (maskeli isim, ör. "Ay Ka") ile
    doğrular.
-5. Kullanıcı, ilgili etkinlik için uygun **gün/saat kontenjanlarından**
+8. Kullanıcı, ilgili etkinlik için uygun **gün/saat kontenjanlarından**
    birini seçer.
-6. Seçim onaylandığında o etkinliğe ait **PDF bilet doğrudan indirilir** ve
+9. Seçim onaylandığında o etkinliğe ait **PDF bilet doğrudan indirilir** ve
    giriş numarası kullanılmış olarak işaretlenir.
 
 ## 3. Context & Constraint — Veri Modeli & Kurallar
@@ -60,7 +85,8 @@ Uçtan uca akış:
 ### Kontenjan
 - Etkinlik başına bilet sayısı **20–60** arasında değişir.
 - Her **etkinlik × gün × saat** kombinasyonunun kendi ayrı ve sınırlı
-  kontenjanı vardır.
+  kontenjanı vardır. Bu kombinasyonlar ve kontenjan sayıları **admin
+  panelinden** tanımlanır/düzenlenir (bkz. Bölüm 1).
 - Kontenjan dolan bir kombinasyon **arayüzde net biçimde "Dolu"** olarak
   işaretlenir ve seçilemez hale gelir.
 
@@ -108,14 +134,17 @@ Uçtan uca akış:
   bulunur (gün/saat'e göre farklılaşmaz).
 
 ### Excel veri aktarımı
-- Kazanan listesi **statik/geliştirici eliyle** aktarılır: proje sahibi,
-  **Ad Soyad ve giriş numarasını birlikte içeren** Excel dosyasını
-  hazırlayıp geliştiriciye iletir; geliştirici bu eşleşmeyi olduğu gibi
-  (değiştirmeden/yeniden üretmeden) sisteme statik veri olarak işler ve
-  deploy eder. **Uygulama giriş numarası üretmez** — numaralar Excel'de
-  zaten hazır gelir.
-- Ayrı bir "dosya yükleme" arayüzü/endpoint'i **yoktur** — bu, admin paneli
-  olmaması ilkesiyle tutarlıdır.
+- Kazanan listesi **admin paneli üzerinden Excel yükleme** ile aktarılır:
+  proje sahibi, **Ad Soyad ve giriş numarasını birlikte içeren** Excel
+  dosyasını hazırlar (numaraları kendisi üretir) ve ilgili etkinlik için
+  panelden yükler. **Uygulama giriş numarası üretmez** — numaralar Excel'de
+  zaten hazır gelir; sistem bu eşleşmeyi olduğu gibi kaydeder.
+- **Tekrar yükleme davranışı — append:** Bir etkinlik için daha önce Excel
+  yüklenmişse ve admin aynı etkinliğe yeni bir Excel yüklerse, yeni
+  satırlar mevcut listeye **eklenir**; var olan kayıtlar değişmez/silinmez.
+  Eğer yeni Excel'de zaten sistemde kayıtlı bir giriş numarası veya
+  ad-soyad tekrar ediyorsa, o satır **atlanır** ve admin'e yükleme sonunda
+  atlanan satırların bir özeti/listesi gösterilir (sessizce yutulmaz).
 - Giriş numaralarının kazananlara nasıl iletileceği (e-posta, SMS, anket
   platformu vb.) bu sistemin kapsamı dışındadır.
 
@@ -125,7 +154,9 @@ Uçtan uca akış:
 - Sade, zarif, kültür/sanat odaklı bir tasarım dili; yoğun beyaz alan
   kullanımı; tipografinin öne çıktığı, dekoratif öğelerin minimize edildiği
   bir görsel yaklaşım.
-- Marka, logo, renk paleti gibi somut detaylar bir panelden yönetilmez;
+- Marka, logo, renk paleti gibi somut tasarım detayları **admin panelinden
+  yönetilmez** (admin paneli yalnızca Bölüm 1'de sayılan veri işlemlerini
+  yapar — etkinlik/kontenjan/Excel/PDF); tasarım, `Design.md` ("Sage") ve
   geliştiriciye iletilen görsel/renk kodları üzerinden koda **sabit** olarak
   işlenir.
 
@@ -144,11 +175,38 @@ Uçtan uca akış:
   (sunucu tarafında atomik kilitleme gereklidir).
 - **Kontenjan görünürlüğü**: dolu kombinasyonlar arayüzde açıkça ve
   yanıltmayacak şekilde "Dolu" olarak işaretlenir.
+- **Admin URL gizliliği**: Admin paneli şifre yerine gizli bir URL ile
+  korunduğu için (bkz. Bölüm 1), bu URL'nin sızmaması kritik güvenlik
+  önlemidir:
+  - URL, arama motorları tarafından indekslenmemelidir (`robots.txt` /
+    `noindex` meta etiketi).
+  - URL, hata mesajlarına, loglara, kullanıcı tarafına giden HTML/JS'e veya
+    genel (public) sitemap/kaynak dosyalarına yazılmamalıdır.
+  - URL tahmin edilemeyecek kadar uzun/rastgele olmalıdır (ör. UUID
+    tabanlı bir path); "admin", "yonetim" gibi tahmin edilebilir kelimeler
+    içermemelidir.
+  - Bu, şifreli bir login'e eşdeğer bir güvenlik garantisi **değildir**;
+    proje sahibi bu riski bilinçli olarak kabul etmiştir (bkz. Bölüm 1).
 
 ---
 
 ## Revizyon geçmişi
 
+- **v4 — Admin paneli eklendi:** Proje sahibi, v1'deki "admin paneli yoktur,
+  her şey kod/dosya seviyesinde statik yönetilir" kararını **geçersiz
+  kıldı**. Artık tam bir admin paneli vardır (etkinlik/kontenjan/gün-saat
+  yönetimi, Excel yükleme, PDF yükleme — bkz. Bölüm 1 ve 2). Bununla
+  birlikte netleşen alt kararlar:
+  - Admin paneli erişimi: kullanıcı adı/şifre değil, **gizli/tahmin
+    edilemez URL** (bkz. Bölüm 1, 5).
+  - Excel'de giriş numaraları hâlâ **admin tarafından üretilip** yüklenir
+    (v3'teki karar korundu, sistem numara üretmiyor).
+  - Aynı etkinliğe tekrar Excel yüklenirse davranış **append**'tir (yeni
+    satırlar eklenir, var olanlar korunur); çakışan (tekrar eden) numara/isim
+    satırları atlanır ve admin'e özet gösterilir (bkz. Bölüm 3).
+  - Kullanıcı tarafında hâlâ **hiçbir kimlik doğrulama yoktur** — bu
+    değişiklik yalnızca admin tarafını etkiler, Bölüm 5'teki "ekstra kimlik
+    doğrulama yok" kuralı kullanıcı paneli için geçerliliğini korur.
 - **v3 — Numara üretimi ve giriş etkileşimi:** Proje sahibi, giriş
   numaralarını kendisi üretip Ad Soyad ile eşleştirerek Excel'i doğrudan
   kendisi yükleyeceğini belirtti (v2'deki "geliştirici numara üretir"
@@ -177,10 +235,17 @@ geliştiriciye bırakılmıştır:
    Bölüm 3, "Giriş numarası ve isim eşleştirme".
 2. Geçersiz numara girişinde numara enumerasyonunu kolaylaştırmayacak genel
    bir hata mesajı gösterilmesi — Bölüm 5.
+3. Append modunda çakışan (tekrar eden numara/isim) satırların sessizce
+   yutulmayıp **atlanıp admin'e özet olarak gösterilmesi** — Bölüm 3,
+   "Excel veri aktarımı".
+4. Admin URL'sinin sızmasını önleyecek somut önlemler (noindex, log/hata
+   mesajlarına yazılmama, tahmin edilemez uzunluk) — Bölüm 5.
 
 ## Kapsam dışı (Out of scope)
 
 - Anket/çekiliş sürecinin kendisi (başka platformda yürütülür).
-- Kullanıcı hesabı, giriş/kayıt akışı, e-posta/SMS doğrulama.
-- Admin paneli veya herhangi bir runtime veri yönetim arayüzü.
+- Kullanıcı hesabı, giriş/kayıt akışı, e-posta/SMS doğrulama (kullanıcı
+  tarafı için — admin paneli artık kapsam içindedir, bkz. Bölüm 1).
+- Giriş numaralarının kazananlara iletim kanalı (e-posta/SMS/anket platformu).
 - Kişiye özel (unique) PDF üretimi — biletler etkinlik başına ortaktır.
+- Çoklu admin hesabı/rol yönetimi — tek admin, tek gizli URL yeterlidir.
