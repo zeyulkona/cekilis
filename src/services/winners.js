@@ -11,8 +11,9 @@ function maskName(fullName) {
   return `${first.slice(0, 2)} ${last.slice(0, 2)}`;
 }
 
-function findByEntryNumber(entryNumber) {
-  return db.prepare('SELECT * FROM winners WHERE entry_number = ?').get(entryNumber);
+async function findByEntryNumber(entryNumber) {
+  const { rows } = await db.query('SELECT * FROM winners WHERE entry_number = $1', [entryNumber]);
+  return rows[0];
 }
 
 module.exports = { maskName, findByEntryNumber };

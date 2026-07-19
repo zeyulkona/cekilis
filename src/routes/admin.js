@@ -1,16 +1,11 @@
 const express = require('express');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const db = require('../db');
 const { importExcelForEvent } = require('../services/excelImport');
 const { slotsForEvent } = require('../services/claims');
+const { uploadEventPdf } = require('../services/blobStorage');
 
 const router = express.Router();
-
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', '..', 'data', 'uploads');
-const PDF_DIR = path.join(UPLOAD_DIR, 'pdfs');
-fs.mkdirSync(PDF_DIR, { recursive: true });
 
 const excelUpload = multer({
   storage: multer.memoryStorage(),
@@ -18,10 +13,7 @@ const excelUpload = multer({
 });
 
 const pdfUpload = multer({
-  storage: multer.diskStorage({
-    destination: PDF_DIR,
-    filename: (req, file, cb) => cb(null, `event-${req.params.id}.pdf`),
-  }),
+  storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => cb(null, file.mimetype === 'application/pdf'),
   limits: { fileSize: 20 * 1024 * 1024 },
 });
@@ -33,16 +25,20 @@ router.use((req, res, next) => {
   next();
 });
 
-function loadEventDetail(eventId) {
-  const event = db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+async function loadEventDetail(eventId) {
+  const { rows: eventRows } = await db.query('SELECT * FROM events WHERE id = $1', [eventId]);
+  const event = eventRows[0];
   if (!event) return null;
-  const slots = slotsForEvent(eventId);
-  const winnerCount = db.prepare('SELECT COUNT(*) c FROM winners WHERE event_id = ?').get(eventId).c;
-  return { event, slots, winnerCount };
+  const slots = await slotsForEvent(eventId);
+  const { rows: countRows } = await db.query(
+    'SELECT COUNT(*)::int AS c FROM winners WHERE event_id = $1',
+    [eventId]
+  );
+  return { event, slots, winnerCount: countRows[0].c };
 }
 
-router.get('/', (req, res) => {
-  const events = db.prepare('SELECT * FROM events ORDER BY created_at DESC').all();
+router.get('/', async (req, res) => {
+  const { rows: events } = await db.query('SELECT * FROM events ORDER BY created_at DESC');
   res.render('admin/dashboard', { events, basePath: req.baseUrl });
 });
 
@@ -50,51 +46,50 @@ router.get('/etkinlikler/yeni', (req, res) => {
   res.render('admin/event-new', { error: null, basePath: req.baseUrl });
 });
 
-router.post('/etkinlikler', (req, res) => {
+router.post('/etkinlikler', async (req, res) => {
   const name = String(req.body.name || '').trim();
   if (!name) {
     return res.render('admin/event-new', { error: 'Etkinlik adı zorunlu.', basePath: req.baseUrl });
   }
-  const info = db
-    .prepare('INSERT INTO events (name, description) VALUES (?, ?)')
-    .run(name, req.body.description ? String(req.body.description).trim() : null);
-  res.redirect(`${req.baseUrl}/etkinlikler/${info.lastInsertRowid}`);
+  const { rows } = await db.query(
+    'INSERT INTO events (name, description) VALUES ($1, $2) RETURNING id',
+    [name, req.body.description ? String(req.body.description).trim() : null]
+  );
+  res.redirect(`${req.baseUrl}/etkinlikler/${rows[0].id}`);
 });
 
-router.get('/etkinlikler/:id', (req, res) => {
-  const detail = loadEventDetail(req.params.id);
+router.get('/etkinlikler/:id', async (req, res) => {
+  const detail = await loadEventDetail(req.params.id);
   if (!detail) return res.status(404).render('user/error', { message: 'Etkinlik bulunamadı.' });
   res.render('admin/event-detail', { ...detail, importSummary: null, pdfError: null, basePath: req.baseUrl });
 });
 
-router.post('/etkinlikler/:id/slotlar', (req, res) => {
+router.post('/etkinlikler/:id/slotlar', async (req, res) => {
   const { day_label, time_label, quota } = req.body;
   const q = Number(quota);
   if (day_label && time_label && q > 0) {
-    db.prepare('INSERT INTO slots (event_id, day_label, time_label, quota) VALUES (?, ?, ?, ?)').run(
-      req.params.id,
-      String(day_label).trim(),
-      String(time_label).trim(),
-      q
+    await db.query(
+      'INSERT INTO slots (event_id, day_label, time_label, quota) VALUES ($1, $2, $3, $4)',
+      [req.params.id, String(day_label).trim(), String(time_label).trim(), q]
     );
   }
   res.redirect(`${req.baseUrl}/etkinlikler/${req.params.id}`);
 });
 
-router.post('/etkinlikler/:id/slotlar/:slotId/kontenjan', (req, res) => {
+router.post('/etkinlikler/:id/slotlar/:slotId/kontenjan', async (req, res) => {
   const q = Number(req.body.quota);
   if (q > 0) {
-    db.prepare('UPDATE slots SET quota = ? WHERE id = ? AND event_id = ?').run(
+    await db.query('UPDATE slots SET quota = $1 WHERE id = $2 AND event_id = $3', [
       q,
       req.params.slotId,
-      req.params.id
-    );
+      req.params.id,
+    ]);
   }
   res.redirect(`${req.baseUrl}/etkinlikler/${req.params.id}`);
 });
 
-router.post('/etkinlikler/:id/excel', excelUpload.single('excel'), (req, res) => {
-  const detail = loadEventDetail(req.params.id);
+router.post('/etkinlikler/:id/excel', excelUpload.single('excel'), async (req, res) => {
+  const detail = await loadEventDetail(req.params.id);
   if (!detail) return res.status(404).render('user/error', { message: 'Etkinlik bulunamadı.' });
 
   if (!req.file) {
@@ -107,8 +102,8 @@ router.post('/etkinlikler/:id/excel', excelUpload.single('excel'), (req, res) =>
   }
 
   try {
-    const summary = importExcelForEvent(detail.event.id, req.file.buffer);
-    const refreshed = loadEventDetail(req.params.id);
+    const summary = await importExcelForEvent(detail.event.id, req.file.buffer);
+    const refreshed = await loadEventDetail(req.params.id);
     res.render('admin/event-detail', {
       ...refreshed,
       importSummary: summary,
@@ -126,8 +121,8 @@ router.post('/etkinlikler/:id/excel', excelUpload.single('excel'), (req, res) =>
 });
 
 router.post('/etkinlikler/:id/pdf', (req, res, next) => {
-  pdfUpload.single('pdf')(req, res, (err) => {
-    const detail = loadEventDetail(req.params.id);
+  pdfUpload.single('pdf')(req, res, async (err) => {
+    const detail = await loadEventDetail(req.params.id);
     if (!detail) return res.status(404).render('user/error', { message: 'Etkinlik bulunamadı.' });
 
     if (err || !req.file) {
@@ -139,8 +134,21 @@ router.post('/etkinlikler/:id/pdf', (req, res, next) => {
       });
     }
 
-    db.prepare("UPDATE events SET pdf_uploaded_at = datetime('now') WHERE id = ?").run(req.params.id);
-    res.redirect(`${req.baseUrl}/etkinlikler/${req.params.id}`);
+    try {
+      const pdfUrl = await uploadEventPdf(detail.event.id, req.file.buffer);
+      await db.query(
+        "UPDATE events SET pdf_url = $1, pdf_uploaded_at = now() WHERE id = $2",
+        [pdfUrl, req.params.id]
+      );
+      res.redirect(`${req.baseUrl}/etkinlikler/${req.params.id}`);
+    } catch (uploadErr) {
+      res.render('admin/event-detail', {
+        ...detail,
+        importSummary: null,
+        pdfError: uploadErr.message,
+        basePath: req.baseUrl,
+      });
+    }
   });
 });
 

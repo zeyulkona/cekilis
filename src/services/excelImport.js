@@ -40,26 +40,18 @@ function parseWorkbook(buffer) {
 // numbers (checked system-wide, since entry_number is globally unique —
 // see INTENT.md v5) or duplicate names within this event are skipped, not
 // silently dropped — every skip is reported back with a reason.
-function importExcelForEvent(eventId, buffer) {
+async function importExcelForEvent(eventId, buffer) {
   const rows = parseWorkbook(buffer);
   const skipped = [];
   let inserted = 0;
 
-  const txn = db.transaction(() => {
-    const existingNames = new Set(
-      db
-        .prepare('SELECT full_name FROM winners WHERE event_id = ?')
-        .all(eventId)
-        .map((w) => normalizeName(w.full_name))
+  await db.withTransaction(async (client) => {
+    const { rows: existingRows } = await client.query(
+      'SELECT full_name FROM winners WHERE event_id = $1',
+      [eventId]
     );
+    const existingNames = new Set(existingRows.map((w) => normalizeName(w.full_name)));
     const seenNumbers = new Set();
-    const insertStmt = db.prepare(
-      'INSERT INTO winners (event_id, full_name, entry_number) VALUES (?, ?, ?)'
-    );
-    const findNumberStmt = db.prepare(
-      `SELECT w.entry_number, e.name AS event_name FROM winners w
-       JOIN events e ON e.id = w.event_id WHERE w.entry_number = ?`
-    );
 
     for (const row of rows) {
       if (!row.full_name || !row.entry_number) {
@@ -71,9 +63,13 @@ function importExcelForEvent(eventId, buffer) {
         skipped.push({ ...row, reason: 'Numara dosyada tekrar ediyor' });
         continue;
       }
-      const existingNumber = findNumberStmt.get(row.entry_number);
-      if (existingNumber) {
-        skipped.push({ ...row, reason: `Numara zaten kayıtlı (${existingNumber.event_name})` });
+      const { rows: existingNumberRows } = await client.query(
+        `SELECT e.name AS event_name FROM winners w
+         JOIN events e ON e.id = w.event_id WHERE w.entry_number = $1`,
+        [row.entry_number]
+      );
+      if (existingNumberRows[0]) {
+        skipped.push({ ...row, reason: `Numara zaten kayıtlı (${existingNumberRows[0].event_name})` });
         continue;
       }
 
@@ -83,14 +79,15 @@ function importExcelForEvent(eventId, buffer) {
         continue;
       }
 
-      insertStmt.run(eventId, row.full_name, row.entry_number);
+      await client.query(
+        'INSERT INTO winners (event_id, full_name, entry_number) VALUES ($1, $2, $3)',
+        [eventId, row.full_name, row.entry_number]
+      );
       seenNumbers.add(row.entry_number);
       existingNames.add(normalized);
       inserted += 1;
     }
   });
-
-  txn();
 
   return { total: rows.length, inserted, skipped };
 }

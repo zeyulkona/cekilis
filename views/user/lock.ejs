@@ -12,7 +12,7 @@
     <div
       id="timer-ring"
       class="timer-ring"
-      data-expires-at="<%= claim.expires_at.replace(' ', 'T') %>Z"
+      data-expires-at="<%= new Date(claim.expires_at).toISOString() %>"
       data-lock-minutes="<%= lockMinutes %>"
     >
       <span id="timer-text">5:00</span>

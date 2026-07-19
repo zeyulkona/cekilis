@@ -70,7 +70,7 @@
     <% } %>
 
     <h2>PDF Bilet</h2>
-    <p>Durum: <%= event.pdf_uploaded_at ? ('Yüklendi (' + event.pdf_uploaded_at + ')') : 'Henüz yüklenmedi' %></p>
+    <p>Durum: <%= event.pdf_uploaded_at ? ('Yüklendi (' + new Date(event.pdf_uploaded_at).toLocaleString('tr-TR') + ')') : 'Henüz yüklenmedi' %></p>
     <% if (typeof pdfError !== 'undefined' && pdfError) { %>
       <p class="error-text"><%= pdfError %></p>
     <% } %>

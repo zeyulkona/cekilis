@@ -1,97 +1,110 @@
-process.env.DB_PATH = ':memory:';
+process.env.POSTGRES_URL =
+  process.env.TEST_POSTGRES_URL || 'postgres://cekilis:cekilis_dev_pw@localhost:5432/cekilis_test';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const db = require('../src/db');
 const claims = require('../src/services/claims');
 
-function makeEventWithSlot(quota) {
-  const eventId = db.prepare('INSERT INTO events (name) VALUES (?)').run('Test').lastInsertRowid;
-  const slotId = db
-    .prepare('INSERT INTO slots (event_id, day_label, time_label, quota) VALUES (?,?,?,?)')
-    .run(eventId, '2026-01-01', '20:00', quota).lastInsertRowid;
-  return { eventId, slotId };
+test.beforeEach(async () => {
+  await db.query('TRUNCATE events, slots, winners, claims RESTART IDENTITY CASCADE');
+});
+
+test.after(async () => {
+  await db.pool.end();
+});
+
+async function makeEventWithSlot(quota) {
+  const { rows: eventRows } = await db.query('INSERT INTO events (name) VALUES ($1) RETURNING id', ['Test']);
+  const eventId = eventRows[0].id;
+  const { rows: slotRows } = await db.query(
+    'INSERT INTO slots (event_id, day_label, time_label, quota) VALUES ($1,$2,$3,$4) RETURNING id',
+    [eventId, '2026-01-01', '20:00', quota]
+  );
+  return { eventId, slotId: slotRows[0].id };
 }
 
-function makeWinner(eventId, entryNumber) {
-  return db
-    .prepare('INSERT INTO winners (event_id, full_name, entry_number) VALUES (?,?,?)')
-    .run(eventId, 'Test Kisi', entryNumber).lastInsertRowid;
+async function makeWinner(eventId, entryNumber) {
+  const { rows } = await db.query(
+    'INSERT INTO winners (event_id, full_name, entry_number) VALUES ($1,$2,$3) RETURNING id',
+    [eventId, 'Test Kisi', entryNumber]
+  );
+  return rows[0].id;
 }
 
-test('lockSlot rejects once quota is reached', () => {
-  const { eventId, slotId } = makeEventWithSlot(1);
-  const w1 = makeWinner(eventId, 'A1');
-  const w2 = makeWinner(eventId, 'A2');
+test('lockSlot rejects once quota is reached', async () => {
+  const { eventId, slotId } = await makeEventWithSlot(1);
+  const w1 = await makeWinner(eventId, 'A1');
+  const w2 = await makeWinner(eventId, 'A2');
 
-  claims.lockSlot(w1, slotId);
-  assert.throws(() => claims.lockSlot(w2, slotId), claims.SlotFullError);
+  await claims.lockSlot(w1, slotId);
+  await assert.rejects(() => claims.lockSlot(w2, slotId), claims.SlotFullError);
 
-  const rows = db.prepare('SELECT * FROM claims WHERE slot_id = ?').all(slotId);
+  const { rows } = await db.query('SELECT * FROM claims WHERE slot_id = $1', [slotId]);
   assert.equal(rows.length, 1);
 });
 
-test('a winner cannot hold two active locks at once', () => {
-  const { eventId, slotId } = makeEventWithSlot(5);
-  const { slotId: otherSlotId } = makeEventWithSlot(5);
-  const w1 = makeWinner(eventId, 'B1');
+test('a winner cannot hold two active locks at once (different slots)', async () => {
+  const { eventId, slotId } = await makeEventWithSlot(5);
+  const { slotId: otherSlotId } = await makeEventWithSlot(5);
+  const w1 = await makeWinner(eventId, 'B1');
 
-  claims.lockSlot(w1, slotId);
-  assert.throws(() => claims.lockSlot(w1, otherSlotId), claims.AlreadyLockedError);
+  await claims.lockSlot(w1, slotId);
+  await assert.rejects(() => claims.lockSlot(w1, otherSlotId), claims.AlreadyLockedError);
 });
 
-test('entry number is single-use: cannot lock again after claiming', () => {
-  const { eventId, slotId } = makeEventWithSlot(5);
-  const { slotId: otherSlotId } = makeEventWithSlot(5);
-  const w1 = makeWinner(eventId, 'C1');
+test('entry number is single-use: cannot lock again after claiming', async () => {
+  const { eventId, slotId } = await makeEventWithSlot(5);
+  const { slotId: otherSlotId } = await makeEventWithSlot(5);
+  const w1 = await makeWinner(eventId, 'C1');
 
-  claims.lockSlot(w1, slotId);
-  const confirmed = claims.confirmClaim(w1, slotId);
+  await claims.lockSlot(w1, slotId);
+  const confirmed = await claims.confirmClaim(w1, slotId);
   assert.equal(confirmed, true);
 
-  assert.throws(() => claims.lockSlot(w1, otherSlotId), claims.AlreadyUsedError);
+  await assert.rejects(() => claims.lockSlot(w1, otherSlotId), claims.AlreadyUsedError);
 });
 
-test('confirmClaim fails once the 5-minute lock has expired', () => {
-  const { eventId, slotId } = makeEventWithSlot(5);
-  const w1 = makeWinner(eventId, 'D1');
+test('confirmClaim fails once the 5-minute lock has expired', async () => {
+  const { eventId, slotId } = await makeEventWithSlot(5);
+  const w1 = await makeWinner(eventId, 'D1');
 
-  const claim = claims.lockSlot(w1, slotId);
-  db.prepare("UPDATE claims SET expires_at = datetime('now', '-1 second') WHERE id = ?").run(claim.id);
+  const claim = await claims.lockSlot(w1, slotId);
+  await db.query("UPDATE claims SET expires_at = now() - interval '1 second' WHERE id = $1", [claim.id]);
 
-  const confirmed = claims.confirmClaim(w1, slotId);
+  const confirmed = await claims.confirmClaim(w1, slotId);
   assert.equal(confirmed, false);
 });
 
-test('an expired lock releases the slot for someone else without waiting for the sweep', () => {
-  const { eventId, slotId } = makeEventWithSlot(1);
-  const w1 = makeWinner(eventId, 'E1');
-  const w2 = makeWinner(eventId, 'E2');
+test('an expired lock releases the slot for someone else without waiting for a sweep', async () => {
+  const { eventId, slotId } = await makeEventWithSlot(1);
+  const w1 = await makeWinner(eventId, 'E1');
+  const w2 = await makeWinner(eventId, 'E2');
 
-  const claim = claims.lockSlot(w1, slotId);
-  db.prepare("UPDATE claims SET expires_at = datetime('now', '-1 second') WHERE id = ?").run(claim.id);
+  const claim = await claims.lockSlot(w1, slotId);
+  await db.query("UPDATE claims SET expires_at = now() - interval '1 second' WHERE id = $1", [claim.id]);
 
   // No sweep has run; this must succeed purely via the lazy time-aware check.
-  assert.doesNotThrow(() => claims.lockSlot(w2, slotId));
+  await assert.doesNotReject(() => claims.lockSlot(w2, slotId));
 });
 
-test('20 concurrent lock attempts on a quota=1 slot: exactly one succeeds', async () => {
-  const { eventId, slotId } = makeEventWithSlot(1);
-  const winnerIds = Array.from({ length: 20 }, (_, i) => makeWinner(eventId, `F${i}`));
+test('20 truly concurrent lock attempts (real overlapping transactions) on a quota=1 slot: exactly one succeeds', async () => {
+  const { eventId, slotId } = await makeEventWithSlot(1);
+  const winnerIds = [];
+  for (let i = 0; i < 20; i += 1) {
+    winnerIds.push(await makeWinner(eventId, `F${i}`));
+  }
 
   const results = await Promise.all(
     winnerIds.map((id) =>
-      Promise.resolve().then(() => {
-        try {
-          claims.lockSlot(id, slotId);
-          return true;
-        } catch {
-          return false;
-        }
-      })
+      claims
+        .lockSlot(id, slotId)
+        .then(() => true)
+        .catch(() => false)
     )
   );
 
   assert.equal(results.filter(Boolean).length, 1);
-  assert.equal(db.prepare('SELECT COUNT(*) c FROM claims WHERE slot_id = ?').get(slotId).c, 1);
+  const { rows } = await db.query('SELECT COUNT(*)::int AS c FROM claims WHERE slot_id = $1', [slotId]);
+  assert.equal(rows[0].c, 1);
 });

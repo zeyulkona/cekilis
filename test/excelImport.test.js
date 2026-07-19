@@ -1,10 +1,19 @@
-process.env.DB_PATH = ':memory:';
+process.env.POSTGRES_URL =
+  process.env.TEST_POSTGRES_URL || 'postgres://cekilis:cekilis_dev_pw@localhost:5432/cekilis_test';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const XLSX = require('xlsx');
 const db = require('../src/db');
 const { importExcelForEvent } = require('../src/services/excelImport');
+
+test.beforeEach(async () => {
+  await db.query('TRUNCATE events, slots, winners, claims RESTART IDENTITY CASCADE');
+});
+
+test.after(async () => {
+  await db.pool.end();
+});
 
 function bufferFromRows(rows) {
   const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -13,8 +22,13 @@ function bufferFromRows(rows) {
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
 
-test('imports valid rows and skips in-file duplicates with reasons', () => {
-  const eventId = db.prepare('INSERT INTO events (name) VALUES (?)').run('E').lastInsertRowid;
+async function makeEvent(name) {
+  const { rows } = await db.query('INSERT INTO events (name) VALUES ($1) RETURNING id', [name]);
+  return rows[0].id;
+}
+
+test('imports valid rows and skips in-file duplicates with reasons', async () => {
+  const eventId = await makeEvent('E');
   const buffer = bufferFromRows([
     ['Ad Soyad', 'Giriş Numarası'],
     ['Ayşe Kaya', '1'],
@@ -23,34 +37,35 @@ test('imports valid rows and skips in-file duplicates with reasons', () => {
     ['Ali Veli', '2'], // duplicate number in this file
   ]);
 
-  const summary = importExcelForEvent(eventId, buffer);
+  const summary = await importExcelForEvent(eventId, buffer);
   assert.equal(summary.total, 4);
   assert.equal(summary.inserted, 2);
   assert.equal(summary.skipped.length, 2);
 });
 
-test('re-uploading appends only new rows and skips everything already on file', () => {
-  const eventId = db.prepare('INSERT INTO events (name) VALUES (?)').run('E2').lastInsertRowid;
+test('re-uploading appends only new rows and skips everything already on file', async () => {
+  const eventId = await makeEvent('E2');
   const buffer = bufferFromRows([
     ['Ad Soyad', 'Giriş Numarası'],
     ['Kişi Bir', '10'],
     ['Kişi Iki', '11'],
   ]);
 
-  importExcelForEvent(eventId, buffer);
-  const second = importExcelForEvent(eventId, buffer);
+  await importExcelForEvent(eventId, buffer);
+  const second = await importExcelForEvent(eventId, buffer);
 
   assert.equal(second.inserted, 0);
   assert.equal(second.skipped.length, 2);
-  assert.equal(db.prepare('SELECT COUNT(*) c FROM winners WHERE event_id = ?').get(eventId).c, 2);
+  const { rows } = await db.query('SELECT COUNT(*)::int AS c FROM winners WHERE event_id = $1', [eventId]);
+  assert.equal(rows[0].c, 2);
 });
 
-test('an entry number already used by a different event is skipped, not reused', () => {
-  const eventA = db.prepare('INSERT INTO events (name) VALUES (?)').run('A').lastInsertRowid;
-  const eventB = db.prepare('INSERT INTO events (name) VALUES (?)').run('B').lastInsertRowid;
+test('an entry number already used by a different event is skipped, not reused', async () => {
+  const eventA = await makeEvent('A');
+  const eventB = await makeEvent('B');
 
-  importExcelForEvent(eventA, bufferFromRows([['Ad Soyad', 'Giriş Numarası'], ['Kişi A', '500']]));
-  const summary = importExcelForEvent(
+  await importExcelForEvent(eventA, bufferFromRows([['Ad Soyad', 'Giriş Numarası'], ['Kişi A', '500']]));
+  const summary = await importExcelForEvent(
     eventB,
     bufferFromRows([['Ad Soyad', 'Giriş Numarası'], ['Kişi B', '500']])
   );
@@ -59,13 +74,14 @@ test('an entry number already used by a different event is skipped, not reused',
   assert.match(summary.skipped[0].reason, /Numara zaten kayıtlı/);
 });
 
-test('rejects a file with unrecognized headers without touching existing data', () => {
-  const eventId = db.prepare('INSERT INTO events (name) VALUES (?)').run('E3').lastInsertRowid;
+test('rejects a file with unrecognized headers without touching existing data', async () => {
+  const eventId = await makeEvent('E3');
   const buffer = bufferFromRows([
     ['Name', 'Number'],
     ['Someone', '1'],
   ]);
 
-  assert.throws(() => importExcelForEvent(eventId, buffer));
-  assert.equal(db.prepare('SELECT COUNT(*) c FROM winners WHERE event_id = ?').get(eventId).c, 0);
+  await assert.rejects(() => importExcelForEvent(eventId, buffer));
+  const { rows } = await db.query('SELECT COUNT(*)::int AS c FROM winners WHERE event_id = $1', [eventId]);
+  assert.equal(rows[0].c, 0);
 });
